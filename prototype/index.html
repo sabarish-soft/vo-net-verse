@@ -16,6 +16,10 @@
     .res{background:#0d1630;padding:10px;border-radius:6px;text-align:center}
     small{color:#88a2d6}
     .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .simulation{position:relative;height:260px;background:#07101f;border-radius:12px;overflow:hidden;border:1px solid #1b2a47;box-shadow:inset 0 0 30px rgba(0,136,255,.08)}
+    .node{position:absolute;width:16px;height:16px;border-radius:50%;background:rgba(110,190,255,.88);box-shadow:0 0 16px rgba(110,190,255,.22)}
+    .probe{position:absolute;width:10px;height:10px;border-radius:50%;background:#9ad4ff;box-shadow:0 0 12px rgba(154,212,255,.8);pointer-events:none;will-change:transform}
+    .probe::after{content:'';position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:#fff}
     footer{margin-top:16px;color:#7f98c0;font-size:13px}
     .muted{color:#7f98c0}
   </style>
@@ -90,6 +94,12 @@
         <div id="compute">0</div>
       </div>
     </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Simulation</h2>
+    <div id="simulation" class="simulation"></div>
+    <div id="simStatus" class="muted" style="margin-top:10px;font-size:13px">Probes are scanning nearby systems...</div>
   </div>
 
   <footer class="muted">Prototype: basic actions and localStorage persistence. State key: <code>von_state_v1</code></footer>
@@ -210,7 +220,98 @@
 
     function commit(){
       renderResources()
+      refreshSimulation()
       if(autosave.value === 'on') save()
+    }
+
+    const simulationEl = document.getElementById('simulation')
+    const simStatus = document.getElementById('simStatus')
+    const simNodes = []
+    const simProbes = []
+    const simBounds = { width: 0, height: 0 }
+
+    function createSimulationObjects(){
+      simulationEl.innerHTML = ''
+      simNodes.length = 0
+      simProbes.length = 0
+      simBounds.width = simulationEl.clientWidth
+      simBounds.height = simulationEl.clientHeight
+
+      for(let i = 0; i < Math.max(3, state.systems + 1); i++){
+        const node = document.createElement('div')
+        node.className = 'node'
+        const pos = randomPosition(28)
+        node.dataset.x = pos.x
+        node.dataset.y = pos.y
+        node.style.left = `${pos.x}px`
+        node.style.top = `${pos.y}px`
+        simulationEl.appendChild(node)
+        simNodes.push(node)
+      }
+
+      for(let i = 0; i < Math.min(8, state.probes); i++){
+        const probe = document.createElement('div')
+        probe.className = 'probe'
+        const pos = randomPosition(20)
+        probe.dataset.x = pos.x
+        probe.dataset.y = pos.y
+        probe.dataset.vx = (Math.random() - 0.5) * 1.6
+        probe.dataset.vy = (Math.random() - 0.5) * 1.6
+        probe.style.transform = `translate(${pos.x}px, ${pos.y}px)`
+        simulationEl.appendChild(probe)
+        simProbes.push(probe)
+      }
+    }
+
+    function randomPosition(margin){
+      const x = margin + Math.random() * (simBounds.width - margin * 2)
+      const y = margin + Math.random() * (simBounds.height - margin * 2)
+      return { x, y }
+    }
+
+    function refreshSimulation(){
+      simStatus.textContent = `Active probes: ${state.probes} • Systems scanned: ${state.systems} • Age: ${state.age}`
+      if(simBounds.width === 0) return
+      if(simNodes.length !== Math.max(3, state.systems + 1) || simProbes.length !== Math.min(8, state.probes)){
+        createSimulationObjects()
+      }
+    }
+
+    function animateSimulation(){
+      const attraction = simNodes[Math.floor(Math.random() * simNodes.length)]
+      simProbes.forEach(probe => {
+        let x = parseFloat(probe.dataset.x)
+        let y = parseFloat(probe.dataset.y)
+        let vx = parseFloat(probe.dataset.vx)
+        let vy = parseFloat(probe.dataset.vy)
+
+        const target = simNodes[Math.floor(Math.random() * simNodes.length)]
+        const tx = parseFloat(target.dataset.x)
+        const ty = parseFloat(target.dataset.y)
+        const dx = tx - x
+        const dy = ty - y
+        const dist = Math.max(30, Math.hypot(dx, dy))
+        const ax = dx / dist * 0.04
+        const ay = dy / dist * 0.04
+
+        vx += ax
+        vy += ay
+        vx *= 0.995
+        vy *= 0.995
+
+        x += vx
+        y += vy
+
+        if(x < 6 || x > simBounds.width - 14) vx *= -1
+        if(y < 6 || y > simBounds.height - 14) vy *= -1
+
+        probe.dataset.x = x
+        probe.dataset.y = y
+        probe.dataset.vx = vx
+        probe.dataset.vy = vy
+        probe.style.transform = `translate(${x}px, ${y}px)`
+      })
+      window.requestAnimationFrame(animateSimulation)
     }
 
     // wire events
@@ -227,6 +328,12 @@
     age.addEventListener('change', e=>{ state.age = e.target.value; commit() })
     autosave.addEventListener('change', e=>{ state.autosave = e.target.value; commit() })
 
+    window.addEventListener('resize', ()=>{
+      simBounds.width = simulationEl.clientWidth
+      simBounds.height = simulationEl.clientHeight
+      refreshSimulation()
+    })
+
     // initial load
     if(!load()){
       state = {...defaultState}
@@ -234,6 +341,9 @@
       renderResources()
       save()
     }
+
+    createSimulationObjects()
+    animateSimulation()
   </script>
 </body>
 </html>
