@@ -204,9 +204,9 @@
     }
 
     function research(){
-      if(state.resources.compute < 2){ alert('Not enough Compute') ; return }
+      if(state.resources.compute < 10){ alert('Not enough Compute') ; return }
       state.resources.knowledge += 20
-      state.resources.compute -= 2
+      state.resources.compute -= 10
       commit()
     }
 
@@ -253,7 +253,8 @@
       simBounds.width = simulationEl.clientWidth
       simBounds.height = simulationEl.clientHeight
 
-      for(let i = 0; i < Math.max(3, state.systems + 1); i++){
+      const desiredNodes = Math.max(3, state.systems + 1)
+      for(let i = 0; i < desiredNodes; i++){
         const node = document.createElement('div')
         node.className = 'node'
         const pos = randomPosition(28)
@@ -265,7 +266,8 @@
         simNodes.push(node)
       }
 
-      for(let i = 0; i < Math.min(8, state.probes); i++){
+      const desiredProbes = Math.min(8, state.probes)
+      for(let i = 0; i < desiredProbes; i++){
         const probe = document.createElement('div')
         probe.className = 'probe'
         const pos = randomPosition(20)
@@ -273,9 +275,59 @@
         probe.dataset.y = pos.y
         probe.dataset.vx = (Math.random() - 0.5) * 1.6
         probe.dataset.vy = (Math.random() - 0.5) * 1.6
+        probe.dataset.targetIndex = Math.floor(Math.random() * Math.max(1, simNodes.length))
         probe.style.transform = `translate(${pos.x}px, ${pos.y}px)`
         simulationEl.appendChild(probe)
         simProbes.push(probe)
+      }
+    }
+
+    function ensureSimulationCounts(){
+      simBounds.width = simulationEl.clientWidth
+      simBounds.height = simulationEl.clientHeight
+
+      const desiredNodes = Math.max(3, state.systems + 1)
+      while(simNodes.length < desiredNodes){
+        const node = document.createElement('div')
+        node.className = 'node'
+        const pos = randomPosition(28)
+        node.dataset.x = pos.x
+        node.dataset.y = pos.y
+        node.style.left = `${pos.x}px`
+        node.style.top = `${pos.y}px`
+        simulationEl.appendChild(node)
+        simNodes.push(node)
+      }
+      while(simNodes.length > desiredNodes){
+        const n = simNodes.pop()
+        if(n && n.parentNode) n.parentNode.removeChild(n)
+      }
+
+      const desiredProbes = Math.min(8, state.probes)
+      while(simProbes.length < desiredProbes){
+        const probe = document.createElement('div')
+        probe.className = 'probe'
+        let pos
+        if(simProbes.length > 0){
+          const ref = simProbes[Math.floor(Math.random() * simProbes.length)]
+          const rx = parseFloat(ref.dataset.x) || simBounds.width/2
+          const ry = parseFloat(ref.dataset.y) || simBounds.height/2
+          pos = { x: rx + (Math.random()-0.5)*24, y: ry + (Math.random()-0.5)*24 }
+        } else {
+          pos = randomPosition(20)
+        }
+        probe.dataset.x = Math.max(6, Math.min(simBounds.width-14, pos.x))
+        probe.dataset.y = Math.max(6, Math.min(simBounds.height-14, pos.y))
+        probe.dataset.vx = (Math.random() - 0.5) * 1.2
+        probe.dataset.vy = (Math.random() - 0.5) * 1.2
+        probe.dataset.targetIndex = Math.floor(Math.random() * Math.max(1, simNodes.length))
+        probe.style.transform = `translate(${probe.dataset.x}px, ${probe.dataset.y}px)`
+        simulationEl.appendChild(probe)
+        simProbes.push(probe)
+      }
+      while(simProbes.length > desiredProbes){
+        const p = simProbes.pop()
+        if(p && p.parentNode) p.parentNode.removeChild(p)
       }
     }
 
@@ -291,9 +343,7 @@
       tickDeltaEl.textContent = `Matter ${formatDelta(tickDelta.matter)} Energy ${formatDelta(tickDelta.energy)} Knowledge ${formatDelta(tickDelta.knowledge)} Compute ${formatDelta(tickDelta.compute)}`
       nextActionEl.textContent = suggestNextAction()
       if(simBounds.width === 0) return
-      if(simNodes.length !== Math.max(3, state.systems + 1) || simProbes.length !== Math.min(8, state.probes)){
-        createSimulationObjects()
-      }
+      ensureSimulationCounts()
     }
 
     function formatDelta(value){
@@ -309,25 +359,33 @@
     }
 
     function animateSimulation(){
+      if(simNodes.length === 0) return window.requestAnimationFrame(animateSimulation)
       simProbes.forEach(probe => {
-        let x = parseFloat(probe.dataset.x)
-        let y = parseFloat(probe.dataset.y)
-        let vx = parseFloat(probe.dataset.vx)
-        let vy = parseFloat(probe.dataset.vy)
+        let x = parseFloat(probe.dataset.x) || 0
+        let y = parseFloat(probe.dataset.y) || 0
+        let vx = parseFloat(probe.dataset.vx) || 0
+        let vy = parseFloat(probe.dataset.vy) || 0
 
-        const target = simNodes[Math.floor(Math.random() * simNodes.length)]
+        // ensure targetIndex exists and is valid
+        let ti = parseInt(probe.dataset.targetIndex) || 0
+        if(ti >= simNodes.length) ti = ti % simNodes.length
+        // occasionally move to the next system so probes traverse all nodes
+        if(Math.random() < 0.01) ti = (ti + 1) % simNodes.length
+        probe.dataset.targetIndex = ti
+
+        const target = simNodes[ti]
         const tx = parseFloat(target.dataset.x)
         const ty = parseFloat(target.dataset.y)
         const dx = tx - x
         const dy = ty - y
-        const dist = Math.max(30, Math.hypot(dx, dy))
-        const ax = dx / dist * 0.04
-        const ay = dy / dist * 0.04
+        const dist = Math.max(20, Math.hypot(dx, dy))
+        const ax = dx / dist * 0.05
+        const ay = dy / dist * 0.05
 
         vx += ax
         vy += ay
-        vx *= 0.995
-        vy *= 0.995
+        vx *= 0.992
+        vy *= 0.992
 
         x += vx
         y += vy
