@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Von Neumann — Demo</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;padding:20px;background:#08121e;color:#e6eef8}
+    .card{background:#0f1a2b;border-radius:8px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+    h1{margin:0 0 8px;font-size:20px}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    label{display:block;font-size:13px;color:#9fb0d7}
+    button{background:#1f6feb;color:white;border:0;padding:8px 12px;border-radius:6px;cursor:pointer}
+    .resources{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+    .res{background:#0b1730;padding:10px;border-radius:6px;text-align:center}
+    small{color:#88a2d6}
+    .muted{color:#7f98c0}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Von Neumann — Scripted Demo</h1>
+    <p class="muted">This page runs a short scripted sequence of actions suitable for recording a demo GIF or video.</p>
+    <div style="margin-top:8px">
+      <button id="play">Play Demo</button>
+      <button id="reset">Reset</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row resources" id="resources"></div>
+    <div style="margin-top:12px" class="row" id="status"></div>
+  </div>
+
+  <footer class="muted">Use this to capture a short demo. See README for recording tips.</footer>
+
+  <script>
+    // lightweight reuse of index logic (minimal)
+    const STORAGE_KEY = 'von_state_v1'
+    const defaultState = { philosophy:'Expansionist', age:'Pioneer Age', resources:{matter:300,energy:150,knowledge:20,compute:10},probes:1,systems:1,factories:0 }
+    let state = {...defaultState}
+
+    const resourcesEl = document.getElementById('resources')
+    const statusEl = document.getElementById('status')
+
+    function renderResources(){
+      resourcesEl.innerHTML = ''
+      const labels = {matter:'Matter', energy:'Energy', knowledge:'Knowledge', compute:'Compute'}
+      for(const k of Object.keys(state.resources)){
+        const el = document.createElement('div')
+        el.className = 'res'
+        el.style.minWidth = '120px'
+        el.innerHTML = `<div style="font-weight:600">${Math.floor(state.resources[k])}</div><small>${labels[k]}</small>`
+        resourcesEl.appendChild(el)
+      }
+      const st = document.createElement('div')
+      st.innerHTML = `<div style="min-width:120px" class="res"><div style="font-weight:600">${state.probes}</div><small>Probes</small></div><div style="min-width:120px" class="res"><div style="font-weight:600">${state.systems}</div><small>Systems</small></div>`
+      statusEl.innerHTML = ''
+      statusEl.appendChild(st)
+    }
+
+    function commit(){ renderResources() }
+
+    function act(name){
+      const note = document.createElement('div')
+      note.textContent = name
+      note.style.color = '#bfe1ff'
+      statusEl.appendChild(note)
+      statusEl.scrollTop = statusEl.scrollHeight
+    }
+
+    function buildProbe(){ if(state.resources.matter>=50){ state.resources.matter-=50; state.probes+=1; state.resources.compute+=1; act('Built probe') } else act('Insufficient matter') }
+    function colonize(){ if(state.resources.matter>=100){ state.resources.matter-=100; state.systems+=1; state.resources.energy+=20; state.resources.knowledge+=5; act('Colonized system') } else act('Insufficient matter') }
+    function research(){ if(state.resources.compute>=2){ state.resources.knowledge+=20; state.resources.compute-=2; act('Research complete') } else act('Insufficient compute') }
+    function buildFactory(){ if(state.resources.matter>=80){ state.resources.matter-=80; state.factories+=1; state.resources.matter+=20; act('Factory built') } else act('Insufficient matter') }
+    function advanceAge(){ if(state.resources.knowledge>=200){ state.resources.knowledge-=200; const ages=['Pioneer Age','Expansion Age','Automation Age','Stellar Age','Dyson Age','Singularity Age','Transcendence Age']; const i=ages.indexOf(state.age); if(i<ages.length-1){ state.age=ages[i+1]; act('Advanced to '+state.age) } } else act('Not enough knowledge') }
+
+    function runScript(){
+      const seq = [
+        [buildProbe,1000],
+        [colonize,1400],
+        [research,1200],
+        [buildFactory,1200],
+        [research,1200],
+        [research,1200],
+        [advanceAge,1400]
+      ]
+      let t = 0
+      seq.forEach(([fn,delay],i)=>{
+        t += delay
+        setTimeout(()=>{ fn(); commit(); }, t)
+      })
+    }
+
+    document.getElementById('play').addEventListener('click', ()=>{ state = {...defaultState}; commit(); runScript() })
+    document.getElementById('reset').addEventListener('click', ()=>{ state = {...defaultState}; commit(); statusEl.innerHTML=''; })
+
+    commit()
+  </script>
+</body>
+</html>

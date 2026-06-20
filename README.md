@@ -107,3 +107,15 @@ npm run record
 Output is written to `prototype/recordings/` (files: `demo.mp4`, `demo.gif` or `frame_*.png` if `ffmpeg` is missing).
 
 If `npm install` fails due to network or environment restrictions, you can still run `demo.html` locally via the manual `python3 -m http.server` method above and record with your preferred screen capture tool.
+
+## GitHub Pages
+You can publish the demo using GitHub Pages by serving the `docs/` folder from the `main` branch. I added the prototype files to `docs/` so Pages can serve them directly.
+
+- Files served: `docs/index.html` and `docs/demo.html`
+- A `.nojekyll` file is included to avoid Jekyll processing.
+
+Expected Pages URL (after enabling Pages in repository Settings):
+
+https://sabarish-soft.github.io/vo-net-verse/
+
+Visit `/demo.html` to load the scripted demo: `https://sabarish-soft.github.io/vo-net-verse/demo.html`
