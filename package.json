@@ -1,0 +1,11 @@
+{
+  "name": "vo-net-verse-recorder",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "record": "node scripts/record-demo.js"
+  },
+  "dependencies": {
+    "puppeteer": "^20.0.0"
+  }
+}

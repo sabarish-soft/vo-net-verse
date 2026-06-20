@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Von Neumann: Prototype</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;padding:20px;background:#0b1020;color:#e6eef8}
+    .card{background:#111427;border-radius:8px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+    h1{margin:0 0 8px;font-size:20px}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    label{display:block;font-size:13px;color:#9fb0d7}
+    button{background:#1f6feb;color:white;border:0;padding:8px 12px;border-radius:6px;cursor:pointer}
+    select,input[type=number]{padding:6px;border-radius:6px;border:1px solid #22314a;background:#0b1730;color:#e6eef8}
+    .resources{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+    .res{background:#0d1630;padding:10px;border-radius:6px;text-align:center}
+    small{color:#88a2d6}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    footer{margin-top:16px;color:#7f98c0;font-size:13px}
+    .muted{color:#7f98c0}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Von Neumann — Prototype</h1>
+    <div class="row">
+      <div>
+        <label>Philosophy</label>
+        <select id="philosophy">
+          <option>Expansionist</option>
+          <option>Industrialist</option>
+          <option>Scientist</option>
+          <option>Preservationist</option>
+          <option>Network Architect</option>
+        </select>
+      </div>
+      <div>
+        <label>Age</label>
+        <select id="age">
+          <option>Pioneer Age</option>
+          <option>Expansion Age</option>
+          <option>Automation Age</option>
+          <option>Stellar Age</option>
+          <option>Dyson Age</option>
+          <option>Singularity Age</option>
+          <option>Transcendence Age</option>
+        </select>
+      </div>
+      <div>
+        <label>Auto-save</label>
+        <select id="autosave"><option value="on">On</option><option value="off">Off</option></select>
+      </div>
+      <div>
+        <label>Save / Load</label>
+        <div class="row">
+          <button id="saveBtn">Save</button>
+          <button id="loadBtn">Load</button>
+          <button id="newBtn">New Game</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row resources" id="resources">
+      <!-- resource tiles inserted by JS -->
+    </div>
+    <div style="margin-top:12px" class="actions">
+      <button id="buildProbe">Build Probe (-50 Matter)</button>
+      <button id="colonize">Colonize System (-100 Matter)</button>
+      <button id="research">Research (+20 Knowledge, -10 Compute)</button>
+      <button id="buildFactory">Build Factory (-80 Matter)</button>
+      <button id="advanceAge">Advance Age (cost: 200 Knowledge)</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Network</h2>
+    <div class="row">
+      <div>
+        <label>Probes</label>
+        <div id="probes">0</div>
+      </div>
+      <div>
+        <label>Colonized Systems</label>
+        <div id="systems">0</div>
+      </div>
+      <div>
+        <label>Compute Capacity</label>
+        <div id="compute">0</div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="muted">Prototype: basic actions and localStorage persistence. State key: <code>von_state_v1</code></footer>
+
+  <script>
+    const STORAGE_KEY = 'von_state_v1'
+
+    const defaultState = {
+      philosophy: 'Expansionist',
+      age: 'Pioneer Age',
+      resources: { matter: 300, energy: 150, knowledge: 20, compute: 10 },
+      probes: 1,
+      systems: 1,
+      factories: 0,
+      autosave: 'on'
+    }
+
+    let state = {...defaultState}
+
+    // DOM refs
+    const philosophy = document.getElementById('philosophy')
+    const age = document.getElementById('age')
+    const autosave = document.getElementById('autosave')
+    const resourcesEl = document.getElementById('resources')
+    const probesEl = document.getElementById('probes')
+    const systemsEl = document.getElementById('systems')
+    const computeEl = document.getElementById('compute')
+
+    function renderResources(){
+      resourcesEl.innerHTML = ''
+      const labels = {matter:'Matter', energy:'Energy', knowledge:'Knowledge', compute:'Compute'}
+      for(const k of Object.keys(state.resources)){
+        const el = document.createElement('div')
+        el.className = 'res'
+        el.innerHTML = `<div style="font-weight:600">${Math.floor(state.resources[k])}</div><small>${labels[k]}</small>`
+        resourcesEl.appendChild(el)
+      }
+      probesEl.textContent = state.probes
+      systemsEl.textContent = state.systems
+      computeEl.textContent = state.resources.compute
+    }
+
+    function save(){
+      try{
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+        console.log('Saved')
+      }catch(e){console.error('Save failed',e)}
+    }
+
+    function load(){
+      try{
+        const raw = localStorage.getItem(STORAGE_KEY)
+        if(!raw) return false
+        state = JSON.parse(raw)
+        applyStateToUI()
+        renderResources()
+        return true
+      }catch(e){console.error('Load failed',e); return false}
+    }
+
+    function newGame(){
+      if(!confirm('Start a new game? This will overwrite current progress.')) return
+      state = {...defaultState}
+      applyStateToUI()
+      renderResources()
+      save()
+    }
+
+    function applyStateToUI(){
+      philosophy.value = state.philosophy
+      age.value = state.age
+      autosave.value = state.autosave || 'on'
+    }
+
+    // Actions
+    function buildProbe(){
+      if(state.resources.matter < 50) { alert('Not enough Matter') ; return }
+      state.resources.matter -= 50
+      state.probes += 1
+      state.resources.compute += 1
+      commit()
+    }
+
+    function colonize(){
+      if(state.resources.matter < 100) { alert('Not enough Matter') ; return }
+      state.resources.matter -= 100
+      state.systems += 1
+      // small bonuses
+      state.resources.energy += 20
+      state.resources.knowledge += 5
+      commit()
+    }
+
+    function research(){
+      if(state.resources.compute < 2){ alert('Not enough Compute') ; return }
+      state.resources.knowledge += 20
+      state.resources.compute -= 2
+      commit()
+    }
+
+    function buildFactory(){
+      if(state.resources.matter < 80){ alert('Not enough Matter') ; return }
+      state.resources.matter -= 80
+      state.factories += 1
+      state.resources.matter += 20 // factories slowly increase output
+      commit()
+    }
+
+    function advanceAge(){
+      if(state.resources.knowledge < 200){ alert('Need 200 Knowledge to advance') ; return }
+      state.resources.knowledge -= 200
+      // simple age progression
+      const ages = ['Pioneer Age','Expansion Age','Automation Age','Stellar Age','Dyson Age','Singularity Age','Transcendence Age']
+      const idx = ages.indexOf(state.age)
+      if(idx < ages.length - 1) state.age = ages[idx+1]
+      commit()
+    }
+
+    function commit(){
+      renderResources()
+      if(autosave.value === 'on') save()
+    }
+
+    // wire events
+    document.getElementById('saveBtn').addEventListener('click', save)
+    document.getElementById('loadBtn').addEventListener('click', ()=>{ if(!load()) alert('No save found') })
+    document.getElementById('newBtn').addEventListener('click', newGame)
+    document.getElementById('buildProbe').addEventListener('click', buildProbe)
+    document.getElementById('colonize').addEventListener('click', colonize)
+    document.getElementById('research').addEventListener('click', research)
+    document.getElementById('buildFactory').addEventListener('click', buildFactory)
+    document.getElementById('advanceAge').addEventListener('click', advanceAge)
+
+    philosophy.addEventListener('change', e=>{ state.philosophy = e.target.value; commit() })
+    age.addEventListener('change', e=>{ state.age = e.target.value; commit() })
+    autosave.addEventListener('change', e=>{ state.autosave = e.target.value; commit() })
+
+    // initial load
+    if(!load()){
+      state = {...defaultState}
+      applyStateToUI()
+      renderResources()
+      save()
+    }
+  </script>
+</body>
+</html>
