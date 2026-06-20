@@ -20,6 +20,11 @@
     .node{position:absolute;width:16px;height:16px;border-radius:50%;background:rgba(110,190,255,.88);box-shadow:0 0 16px rgba(110,190,255,.22)}
     .probe{position:absolute;width:10px;height:10px;border-radius:50%;background:#9ad4ff;box-shadow:0 0 12px rgba(154,212,255,.8);pointer-events:none;will-change:transform}
     .probe::after{content:'';position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:#fff}
+    .simInfo{display:grid;grid-template-columns:repeat(3,minmax(130px,1fr));gap:10px;margin-top:12px}
+    .infoTile{background:rgba(13,22,48,.96);padding:12px;border-radius:10px;border:1px solid #1f2f52}
+    .infoTile strong{display:block;margin-bottom:6px;color:#c8e0ff;font-size:13px}
+    .infoTile div{font-size:14px;line-height:1.5;color:#e6eef8}
+    .hint{color:#8be2ff;font-size:13px;line-height:1.5}
     footer{margin-top:16px;color:#7f98c0;font-size:13px}
     .muted{color:#7f98c0}
   </style>
@@ -99,6 +104,11 @@
   <div class="card">
     <h2 style="margin-top:0">Simulation</h2>
     <div id="simulation" class="simulation"></div>
+    <div class="simInfo">
+      <div class="infoTile"><strong>Tick</strong><div id="tickCount">0</div></div>
+      <div class="infoTile"><strong>Resource flow</strong><div id="tickDelta">Matter+0 Energy+0 Knowledge+0 Compute+0</div></div>
+      <div class="infoTile"><strong>Next action</strong><div id="nextAction">Build probes or colonize to grow.</div></div>
+    </div>
     <div id="simStatus" class="muted" style="margin-top:10px;font-size:13px">Probes are scanning nearby systems...</div>
   </div>
 
@@ -221,14 +231,20 @@
     function commit(){
       renderResources()
       refreshSimulation()
+      updateNextActionHint()
       if(autosave.value === 'on') save()
     }
 
     const simulationEl = document.getElementById('simulation')
     const simStatus = document.getElementById('simStatus')
+    const tickCountEl = document.getElementById('tickCount')
+    const tickDeltaEl = document.getElementById('tickDelta')
+    const nextActionEl = document.getElementById('nextAction')
     const simNodes = []
     const simProbes = []
     const simBounds = { width: 0, height: 0 }
+    let tickNumber = 0
+    let tickDelta = { matter: 0, energy: 0, knowledge: 0, compute: 0 }
 
     function createSimulationObjects(){
       simulationEl.innerHTML = ''
@@ -271,14 +287,28 @@
 
     function refreshSimulation(){
       simStatus.textContent = `Active probes: ${state.probes} • Systems scanned: ${state.systems} • Age: ${state.age}`
+      tickCountEl.textContent = tickNumber
+      tickDeltaEl.textContent = `Matter ${formatDelta(tickDelta.matter)} Energy ${formatDelta(tickDelta.energy)} Knowledge ${formatDelta(tickDelta.knowledge)} Compute ${formatDelta(tickDelta.compute)}`
+      nextActionEl.textContent = suggestNextAction()
       if(simBounds.width === 0) return
       if(simNodes.length !== Math.max(3, state.systems + 1) || simProbes.length !== Math.min(8, state.probes)){
         createSimulationObjects()
       }
     }
 
+    function formatDelta(value){
+      return value >= 0 ? `+${value}` : `${value}`
+    }
+
+    function suggestNextAction(){
+      if(state.resources.matter < 80) return 'Low matter: colonize systems or build a factory to increase output.'
+      if(state.resources.compute < 5) return 'Compute is limited: build more probes to raise capacity.'
+      if(state.resources.knowledge < 200) return 'Research now to unlock a new age.'
+      if(state.systems < 5) return 'Expand to more systems for stronger growth.'
+      return 'You are ready to advance age or keep building your network.'
+    }
+
     function animateSimulation(){
-      const attraction = simNodes[Math.floor(Math.random() * simNodes.length)]
       simProbes.forEach(probe => {
         let x = parseFloat(probe.dataset.x)
         let y = parseFloat(probe.dataset.y)
@@ -314,6 +344,33 @@
       window.requestAnimationFrame(animateSimulation)
     }
 
+    function tickSimulation(){
+      tickNumber += 1
+      const matterGain = Math.max(1, Math.round(state.systems * 2 + state.factories * 1))
+      const energyGain = Math.max(0, Math.round(state.systems * 1 + state.probes * 0.4))
+      const knowledgeGain = Math.max(0, Math.round(state.probes * 0.6 + state.systems * 0.2))
+      const computeGain = Math.max(0, Math.round(state.probes * 0.3 + state.factories * 0.2))
+
+      state.resources.matter += matterGain
+      state.resources.energy += energyGain
+      state.resources.knowledge += knowledgeGain
+      state.resources.compute += computeGain
+
+      tickDelta = {
+        matter: matterGain,
+        energy: energyGain,
+        knowledge: knowledgeGain,
+        compute: computeGain
+      }
+
+      renderResources()
+      refreshSimulation()
+    }
+
+    function updateNextActionHint(){
+      nextActionEl.textContent = suggestNextAction()
+    }
+
     // wire events
     document.getElementById('saveBtn').addEventListener('click', save)
     document.getElementById('loadBtn').addEventListener('click', ()=>{ if(!load()) alert('No save found') })
@@ -344,6 +401,8 @@
 
     createSimulationObjects()
     animateSimulation()
+    tickSimulation()
+    setInterval(tickSimulation, 1000)
   </script>
 </body>
 </html>
